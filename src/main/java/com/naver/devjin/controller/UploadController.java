@@ -3,27 +3,30 @@ package com.naver.devjin.controller;
 import com.naver.devjin.domain.AttachFileDTO;
 import lombok.extern.log4j.Log4j;
 import net.coobird.thumbnailator.Thumbnailator;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Controller
 @Log4j
@@ -34,7 +37,7 @@ public class UploadController {
     }
     @PostMapping("/uploadFormAction")
     public void uploadFormPost(MultipartFile[] uploadFile, Model model){
-        String uploadFolder = "E:\\upload\\temp";
+        String uploadFolder = "C:\\upload\\tmp";
         for(MultipartFile multipartFile :uploadFile) {
             log.info("------------------------------------");
             log.info("Upload File Name: "+multipartFile.getOriginalFilename());
@@ -54,7 +57,7 @@ public class UploadController {
         @ResponseBody
         public ResponseEntity<byte[]>getFile(String fileName){
             log.info("fileName: "+fileName);
-            File file = new File("E:\\upload\\"+fileName);
+            File file = new File("C:\\upload\\"+fileName);
             log.info("file: "+file);
             ResponseEntity<byte[]> result = null;
 
@@ -80,7 +83,7 @@ public class UploadController {
         log.info("update ajax post...........");
 
         List<AttachFileDTO> list = new ArrayList<>();
-        String uploadFolder = "E:\\upload";
+        String uploadFolder = "C:\\upload";
         String uploadFolderPath = getFolder();
         //make folder ------
         File uploadPath = new File(uploadFolder,uploadFolderPath);
@@ -128,6 +131,41 @@ public class UploadController {
             }
         }
         return new ResponseEntity<>(list, HttpStatus.OK);
+    }
+
+    @GetMapping(value = "/download",produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    @ResponseBody
+    public ResponseEntity<Resource> downloadFile(@RequestHeader("User-Agent") String userAgent,String fileName){
+        log.info("download file: "+fileName);
+        Resource resource =
+                new FileSystemResource("C:\\upload\\"+fileName);
+        if(resource.exists() == false) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        String resourceName = resource.getFilename();
+        HttpHeaders headers = new HttpHeaders();
+        try{
+            String downloadName = null;
+            if(userAgent.contains("Trident")) {
+                log.info("IE browser");
+
+                downloadName = URLEncoder.encode(resourceName,"UTF-8").
+                        replaceAll("\\+"," ");
+            }else if(userAgent.contains("Edge")) {
+                log.info("Edge browser");
+                downloadName = URLEncoder.encode(resourceName,"UTF-8");
+                log.info("Edge name: "+downloadName);
+            }else{
+                log.info("Chrome browser");
+                downloadName = new String(resourceName.getBytes("UTF-8"),"ISO-8859-1");
+            }
+            headers.add("Content-Disposition",
+                    "attachment; filename="+downloadName);
+        }catch (UnsupportedEncodingException e){
+            e.printStackTrace();
+        }
+        return new ResponseEntity<Resource>(resource,headers,HttpStatus.OK);
     }
     private String getFolder(){
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
