@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
@@ -120,7 +121,7 @@ public class UploadController {
                     attachDTO.setImage(true);
 
                     FileOutputStream thumbnail = new FileOutputStream(new File(uploadPath,"s_"+uploadFileName));
-                    Thumbnailator.createThumbnail(multipartFile.getInputStream(),thumbnail,100,100);
+                    Thumbnailator.createThumbnail(multipartFile.getInputStream(),thumbnail,300,300);
 
                     thumbnail.close();
                 }
@@ -144,21 +145,22 @@ public class UploadController {
         }
 
         String resourceName = resource.getFilename();
+        String resourceOriginalName = resourceName.substring(resourceName.indexOf("_")+1);
         HttpHeaders headers = new HttpHeaders();
         try{
             String downloadName = null;
             if(userAgent.contains("Trident")) {
                 log.info("IE browser");
 
-                downloadName = URLEncoder.encode(resourceName,"UTF-8").
+                downloadName = URLEncoder.encode(resourceOriginalName,"UTF-8").
                         replaceAll("\\+"," ");
             }else if(userAgent.contains("Edge")) {
                 log.info("Edge browser");
-                downloadName = URLEncoder.encode(resourceName,"UTF-8");
+                downloadName = URLEncoder.encode(resourceOriginalName,"UTF-8");
                 log.info("Edge name: "+downloadName);
             }else{
                 log.info("Chrome browser");
-                downloadName = new String(resourceName.getBytes("UTF-8"),"ISO-8859-1");
+                downloadName = new String(resourceOriginalName.getBytes("UTF-8"),"ISO-8859-1");
             }
             headers.add("Content-Disposition",
                     "attachment; filename="+downloadName);
@@ -166,6 +168,32 @@ public class UploadController {
             e.printStackTrace();
         }
         return new ResponseEntity<Resource>(resource,headers,HttpStatus.OK);
+    }
+    @PostMapping("/deleteFile")
+    @ResponseBody
+    public ResponseEntity<String> deleteFile(String fileName,String type) {
+        log.info("deleteFile: "+fileName);
+
+        File file;
+
+        try {
+            file = new File("c:\\upload\\"+ URLDecoder.decode(fileName,"UTF-8"));
+
+            file.delete();
+
+            if(type.equals("image")){
+                String largeFileName = file.getAbsolutePath().replace("s_","");
+
+                log.info("largeFileName: "+largeFileName);
+                file = new File(largeFileName);
+
+                file.delete();
+            }
+        }catch (UnsupportedEncodingException e){
+            e.printStackTrace();
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<String>("deleted",HttpStatus.OK);
     }
     private String getFolder(){
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
